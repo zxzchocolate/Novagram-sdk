@@ -300,7 +300,7 @@ class LocalMessenger {
         this.messageInput.focus();
         
         // Clear messages
-        this.messagesContainer.innerHTML = '<div class="welcome-message">Welcome to the server! Start typing to send messages.</div>';
+        this.messagesContainer.innerHTML = '<div class="welcome-message">No messages yet. Say hello.</div>';
     }
     
     showServerSelectScreen() {
@@ -344,7 +344,7 @@ class LocalMessenger {
             if (server.hasPassword) {
                 const lockIcon = document.createElement('span');
                 lockIcon.className = 'lock-icon';
-                lockIcon.textContent = '🔒';
+                lockIcon.textContent = 'Locked';
                 infoDiv.appendChild(lockIcon);
             }
             
