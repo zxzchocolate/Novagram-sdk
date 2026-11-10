@@ -7,8 +7,10 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// The frontend lives beside server.js.
-app.use(express.static(__dirname));
+// Only serve the files the browser needs. Don't expose server.js or package.json.
+app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/style.css', (_req, res) => res.sendFile(path.join(__dirname, 'style.css')));
+app.get('/script.js', (_req, res) => res.sendFile(path.join(__dirname, 'script.js')));
 
 const servers = new Map();
 const userSockets = new Map();
