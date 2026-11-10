@@ -1,107 +1,93 @@
-# Local WiFi Messenger 🌐
+# Novagram
 
-A real-time web-based messenger application that works on your local WiFi network. Perfect for communication between devices on the same network without requiring internet access.
+A small chat server for people on the same Wi-Fi network. Run it on one machine, open the address on another, and chat. No hosted account or database needed.
 
-## Features ✨
+## Requirements
 
-- **Real-time messaging** with WebSocket connections
-- **User presence** - see who's online
-- **Typing indicators** - know when someone is typing
-- **Responsive design** - works on desktop, tablet, and mobile
-- **Local network only** - no internet required
-- **Simple setup** - just run and connect
+- Node.js 18 or newer
+- npm (included with Node.js)
 
-## Quick Start 🚀
+## Run it
 
-1. **Install dependencies:**
-   ```bash
-   cd local-messenger
-   npm install
-   ```
+**Windows**
 
-2. **Start the server:**
-   ```bash
-   npm start
-   ```
-
-3. **Access the messenger:**
-   - On the same computer: `http://localhost:3000`
-   - From other devices on your WiFi network: `http://[YOUR-IP]:3000`
-   
-   The server will display the local IP addresses when it starts.
-
-## How to Use 💬
-
-1. **Join the chat:**
-   - Enter a username (2+ characters)
-   - Click "Join Chat"
-
-2. **Start messaging:**
-   - Type your message and press Enter or click Send
-   - See who's online in the sidebar
-   - Watch for typing indicators
-
-3. **Multiple devices:**
-   - Anyone on your WiFi network can join using your computer's IP address
-   - Each person needs a unique username
-
-## Technical Details 🔧
-
-- **Backend:** Node.js with Express and Socket.IO
-- **Frontend:** Vanilla HTML, CSS, and JavaScript
-- **Real-time:** WebSocket connections for instant messaging
-- **Network:** Binds to `0.0.0.0` to accept connections from all network interfaces
-
-## File Structure 📁
-
-```
-local-messenger/
-├── server.js          # Node.js server with Socket.IO
-├── package.json       # Dependencies and scripts
-├── README.md          # This file
-└── public/
-    ├── index.html     # Main HTML page
-    ├── style.css      # Styling
-    └── script.js      # Client-side JavaScript
+```bat
+start.bat
 ```
 
-## Development 🛠️
+**Linux / macOS**
 
-For development with auto-restart:
-```bash
+```sh
+chmod +x start.sh
+./start.sh
+```
+
+The first run installs the dependencies. The server then prints the local addresses you can open.
+
+You can also start it manually:
+
+```sh
+npm install
+npm start
+```
+
+Open [http://localhost:3000](http://localhost:3000) on the host machine. To join from a phone or another computer on the same network, use the LAN address printed in the terminal.
+
+## Install the command
+
+If you want to run `novagram` from any terminal:
+
+```sh
+npm install -g .
+novagram
+```
+
+That works on Windows, macOS and Linux. To uninstall it later:
+
+```sh
+npm uninstall -g novagram
+```
+
+## Settings
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `PORT` | `3000` | Port to listen on |
+| `NOVAGRAM_ADMIN_PASSWORD` | unset | Enables the admin actions when set |
+
+Example:
+
+```sh
+NOVAGRAM_ADMIN_PASSWORD='your-own-password' npm start
+```
+
+On PowerShell:
+
+```powershell
+$env:NOVAGRAM_ADMIN_PASSWORD = "your-own-password"
+npm start
+```
+
+## What it does
+
+- Separate chat rooms, with optional room passwords
+- Live messages and online-user lists
+- Typing indicators
+- Works in a browser on desktop and mobile
+
+## A note about security
+
+Novagram is intended for a trusted local network. Chat traffic is not end-to-end encrypted, and room passwords are currently held in server memory. Don't expose the server directly to the public internet. Use a firewall and choose a private network you trust.
+
+The admin password is disabled unless you set `NOVAGRAM_ADMIN_PASSWORD`. Don't reuse an important password.
+
+## Development
+
+```sh
+npm install
 npm run dev
 ```
 
-## Network Access 🔗
+## License
 
-The server automatically detects and displays your local IP addresses. Common scenarios:
-
-- **Same computer:** `http://localhost:3000`
-- **Local network:** `http://192.168.1.100:3000` (example IP)
-- **Mobile devices:** Use the same IP address as shown in the server startup
-
-## Security Note 🔒
-
-This application is designed for local network use only. It doesn't include authentication or encryption, making it perfect for trusted local environments like home or office networks. Admin Access: admin123
-
-## Customization 🎨
-
-- **Port:** Change the `PORT` environment variable or modify `server.js`
-- **Styling:** Edit `public/style.css` for custom themes
-- **Features:** Extend `server.js` and `public/script.js` for additional functionality
-
-## Troubleshooting 🔍
-
-**Can't connect from other devices:**
-- Make sure all devices are on the same WiFi network
-- Check if firewall is blocking port 3000
-- Verify the IP address is correct
-
-**Messages not sending:**
-- Check browser console for errors
-- Ensure WebSocket connection is established (green indicator)
-- Try refreshing the page
-
-## License 📄
-
-MIT License - feel free to use and modify as needed!
+MIT. See [LICENSE](LICENSE).
