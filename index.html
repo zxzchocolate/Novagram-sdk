@@ -1,98 +1,110 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Local WiFi Messenger</title>
-    <link rel="stylesheet" href="style.css">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f4f5f6">
+    <title>Novagram</title>
+    <link rel="stylesheet" href="/style.css">
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <div class="container">
-        <div id="serverSelectScreen" class="screen">
+    <main class="container">
+        <section id="serverSelectScreen" class="screen">
             <div class="server-select-box">
-                <h1>🌐 Local WiFi Messenger</h1>
-                <p>Connect with others on your local network</p>
-                
-                <input type="text" id="usernameInput" placeholder="Enter your username" maxlength="20">
-                
-                <div class="server-options">
-                    <div class="option-section">
-                        <h3>Available Servers</h3>
-                        <div id="serversList" class="servers-list">
-                            <div class="loading">Loading servers...</div>
-                        </div>
-                    </div>
-                    
-                    <div class="option-section">
-                        <h3>Create New Server</h3>
-                        <input type="text" id="newServerName" placeholder="Server name" maxlength="30">
-                        <input type="password" id="newServerPassword" placeholder="Password (optional)" maxlength="50">
-                        <button id="createServerBtn">Create Server</button>
-                    </div>
-                </div>
-                
-                <!-- Admin Panel -->
-                <div class="admin-panel">
-                    <h3>🔧 Admin Panel</h3>
-                    <input type="password" id="adminPasswordInput" placeholder="Admin password" maxlength="50">
-                    <div class="admin-buttons">
-                        <button id="resetServersBtn" class="admin-btn reset-btn">Reset All Servers</button>
-                        <button id="endChatBtn" class="admin-btn end-btn">End Chat for All</button>
-                    </div>
-                    <div id="adminMessage" class="admin-message"></div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Password Modal -->
-        <div id="passwordModal" class="modal hidden">
-            <div class="modal-content">
-                <h3>Enter Server Password</h3>
-                <input type="password" id="serverPasswordInput" placeholder="Password">
-                <div class="modal-buttons">
-                    <button id="passwordSubmitBtn">Join</button>
-                    <button id="passwordCancelBtn">Cancel</button>
-                </div>
-            </div>
-        </div>
+                <header class="page-heading">
+                    <p class="eyebrow">LOCAL NETWORK CHAT</p>
+                    <h1>Novagram</h1>
+                    <p>Talk to people on the same network.</p>
+                </header>
 
-        <div id="chatScreen" class="screen hidden">
-            <div class="chat-header">
-                <h2 id="serverTitle">Local WiFi Messenger</h2>
-                <div class="header-controls">
-                    <button id="leaveServerBtn" class="leave-btn">Leave Server</button>
+                <label class="field-label" for="usernameInput">Your name</label>
+                <input type="text" id="usernameInput" placeholder="e.g. alex" maxlength="20" autocomplete="nickname">
+
+                <div class="server-options">
+                    <section class="option-section">
+                        <div class="section-heading">
+                            <h2>Rooms</h2>
+                            <span class="section-note">Available now</span>
+                        </div>
+                        <div id="serversList" class="servers-list" aria-live="polite">
+                            <div class="loading">Looking for rooms…</div>
+                        </div>
+                    </section>
+
+                    <section class="option-section create-section">
+                        <div class="section-heading">
+                            <h2>New room</h2>
+                        </div>
+                        <label class="field-label" for="newServerName">Room name</label>
+                        <input type="text" id="newServerName" placeholder="Give it a name" maxlength="30">
+                        <label class="field-label" for="newServerPassword">Password <span>(optional)</span></label>
+                        <input type="password" id="newServerPassword" placeholder="Leave blank for an open room" maxlength="50">
+                        <button id="createServerBtn" type="button">Create room</button>
+                    </section>
                 </div>
-                <div class="status">
-                    <span id="connectionStatus" class="status-indicator">●</span>
-                    <span id="userCount">0 users online</span>
+
+                <details class="admin-panel">
+                    <summary>Server administration</summary>
+                    <div class="admin-content">
+                        <label class="field-label" for="adminPasswordInput">Admin password</label>
+                        <input type="password" id="adminPasswordInput" placeholder="Admin password" maxlength="50">
+                        <div class="admin-buttons">
+                            <button id="resetServersBtn" class="admin-btn reset-btn" type="button">Reset rooms</button>
+                            <button id="endChatBtn" class="admin-btn end-btn" type="button">Disconnect everyone</button>
+                        </div>
+                        <div id="adminMessage" class="admin-message" role="status"></div>
+                    </div>
+                </details>
+            </div>
+        </section>
+
+        <section id="passwordModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="passwordTitle">
+            <div class="modal-content">
+                <h2 id="passwordTitle">This room is locked</h2>
+                <p>Enter its password to join.</p>
+                <input type="password" id="serverPasswordInput" placeholder="Room password" autocomplete="current-password">
+                <div class="modal-buttons">
+                    <button id="passwordSubmitBtn" type="button">Join room</button>
+                    <button id="passwordCancelBtn" type="button" class="button-secondary">Cancel</button>
                 </div>
             </div>
+        </section>
+
+        <section id="chatScreen" class="screen hidden">
+            <header class="chat-header">
+                <div class="chat-heading">
+                    <p class="eyebrow">NOVAGRAM / ROOM</p>
+                    <h1 id="serverTitle">General Chat</h1>
+                </div>
+                <div class="chat-meta">
+                    <div class="status">
+                        <span id="connectionStatus" class="status-indicator" aria-label="Connection status">●</span>
+                        <span id="userCount">0 users online</span>
+                    </div>
+                    <button id="leaveServerBtn" class="leave-btn" type="button">Leave room</button>
+                </div>
+            </header>
 
             <div class="chat-container">
-                <div class="sidebar">
-                    <h3>Online Users</h3>
+                <aside class="sidebar">
+                    <h2>People here</h2>
                     <ul id="usersList"></ul>
-                </div>
+                </aside>
 
-                <div class="chat-main">
-                    <div id="messagesContainer" class="messages-container">
-                        <div class="welcome-message">
-                            Welcome to the chat! Start typing to send messages.
-                        </div>
+                <section class="chat-main" aria-label="Chat">
+                    <div id="messagesContainer" class="messages-container" aria-live="polite">
+                        <p class="welcome-message">No messages yet. Say hello.</p>
                     </div>
-
-                    <div id="typingIndicator" class="typing-indicator"></div>
-
-                    <div class="message-input-container">
-                        <input type="text" id="messageInput" placeholder="Type your message..." maxlength="500">
-                        <button id="sendBtn">Send</button>
-                    </div>
-                </div>
+                    <div id="typingIndicator" class="typing-indicator" aria-live="polite"></div>
+                    <form class="message-input-container" id="messageForm">
+                        <input type="text" id="messageInput" placeholder="Write a message…" maxlength="500" autocomplete="off" aria-label="Message">
+                        <button id="sendBtn" type="submit">Send</button>
+                    </form>
+                </section>
             </div>
-        </div>
-    </div>
-
-    <script src="script.js"></script>
+        </section>
+    </main>
+    <script src="/script.js"></script>
 </body>
 </html>
