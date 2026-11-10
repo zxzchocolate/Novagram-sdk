@@ -7,15 +7,16 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
+// Only serve the files the browser needs. Don't expose server.js or package.json.
+app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/style.css', (_req, res) => res.sendFile(path.join(__dirname, 'style.css')));
+app.get('/script.js', (_req, res) => res.sendFile(path.join(__dirname, 'script.js')));
 
-// Store servers and users
-const servers = new Map(); // serverId -> { name, users: Map, password }
-const userSockets = new Map(); // socketId -> { username, serverId }
-
-// Default server
+const servers = new Map();
+const userSockets = new Map();
 const DEFAULT_SERVER = 'general';
+const ADMIN_PASSWORD = process.env.NOVAGRAM_ADMIN_PASSWORD;
+
 servers.set(DEFAULT_SERVER, {
     name: 'General Chat',
     users: new Map(),
@@ -24,252 +25,201 @@ servers.set(DEFAULT_SERVER, {
 
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
-
-    // Send available servers list
     socket.emit('serversList', getServersList());
 
-    // Handle creating a server
-    socket.on('createServer', (data) => {
-        const { serverName, password } = data;
+    socket.on('createServer', (data = {}) => {
+        const serverName = String(data.serverName || '').trim().slice(0, 30);
+        const password = String(data.password || '').slice(0, 100);
+        if (!serverName) {
+            socket.emit('joinError', 'Enter a room name first');
+            return;
+        }
+
         const serverId = generateServerId();
-        
         servers.set(serverId, {
             name: serverName,
             users: new Map(),
             password: password || null
         });
-        
+
         io.emit('serversList', getServersList());
-        console.log(`Server "${serverName}" created with ID: ${serverId}`);
-        
         socket.emit('serverCreated', { serverId, serverName });
+        console.log(`Room "${serverName}" created (${serverId})`);
     });
 
-    // Handle joining a server
-    socket.on('joinServer', (data) => {
-        const { serverId, username, password } = data;
-        
-        if (!servers.has(serverId)) {
-            socket.emit('joinError', 'Server not found');
+    socket.on('joinServer', (data = {}) => {
+        const serverId = String(data.serverId || '');
+        const username = String(data.username || '').trim().slice(0, 20);
+        const password = String(data.password || '');
+
+        if (username.length < 2) {
+            socket.emit('joinError', 'Username must be at least 2 characters');
             return;
         }
-        
-        const server = servers.get(serverId);
-        
-        // Check password if server is protected
-        if (server.password && server.password !== password) {
+        if (!servers.has(serverId)) {
+            socket.emit('joinError', 'Room not found');
+            return;
+        }
+
+        const room = servers.get(serverId);
+        if (room.password && room.password !== password) {
             socket.emit('joinError', 'Incorrect password');
             return;
         }
-        
-        // Leave current server if user is in one
+
         leaveCurrentServer(socket.id);
-        
-        // Join new server
-        server.users.set(socket.id, username);
+        room.users.set(socket.id, username);
         userSockets.set(socket.id, { username, serverId });
-        
-        // Join socket room
         socket.join(serverId);
-        
-        // Notify others in the server
         socket.to(serverId).emit('userJoined', username);
-        
-        // Send server info and user list to the new user
         socket.emit('serverJoined', {
             serverId,
-            serverName: server.name,
-            userList: Array.from(server.users.values())
+            serverName: room.name,
+            userList: Array.from(room.users.values())
         });
-        
-        // Send updated user list to all users in the server
-        io.to(serverId).emit('userList', Array.from(server.users.values()));
-        
-        console.log(`${username} joined server "${server.name}" (${serverId})`);
+        io.to(serverId).emit('userList', Array.from(room.users.values()));
+        console.log(`${username} joined "${room.name}"`);
     });
 
-    // Handle leaving server
     socket.on('leaveServer', () => {
         leaveCurrentServer(socket.id);
         socket.emit('serverLeft');
     });
-    
-    // Admin functions
-    socket.on('resetAllServers', (adminPassword) => {
-        // Simple admin password check (you can change this)
-        if (adminPassword !== 'admin123') {
-            socket.emit('adminError', 'Invalid admin password');
+
+    socket.on('resetAllServers', (password) => {
+        if (!ADMIN_PASSWORD || password !== ADMIN_PASSWORD) {
+            socket.emit('adminError', 'Admin actions are disabled or the password is wrong');
             return;
         }
-        
         resetAllServers();
-        console.log('Admin reset: All servers have been reset');
-        socket.emit('adminSuccess', 'All servers have been reset');
+        socket.emit('adminSuccess', 'All rooms have been reset');
     });
-    
-    socket.on('endChatForAll', (adminPassword) => {
-        // Simple admin password check (you can change this)
-        if (adminPassword !== 'admin123') {
-            socket.emit('adminError', 'Invalid admin password');
+
+    socket.on('endChatForAll', (password) => {
+        if (!ADMIN_PASSWORD || password !== ADMIN_PASSWORD) {
+            socket.emit('adminError', 'Admin actions are disabled or the password is wrong');
             return;
         }
-        
         endChatForAllUsers();
-        console.log('Admin action: Chat ended for all users');
-        socket.emit('adminSuccess', 'Chat ended for all users');
+        socket.emit('adminSuccess', 'Everyone has been disconnected');
     });
-    
-    // Keep the original join handler for backward compatibility
+
     socket.on('join', (username) => {
-        // Join the default server
-        socket.emit('joinServer', { serverId: DEFAULT_SERVER, username, password: null });
+        socket.emit('joinServer', {
+            serverId: DEFAULT_SERVER,
+            username,
+            password: null
+        });
     });
 
-    // Handle messages
-    socket.on('message', (data) => {
+    socket.on('message', (data = {}) => {
         const userInfo = userSockets.get(socket.id);
-        if (userInfo && servers.has(userInfo.serverId)) {
-            const messageData = {
-                username: userInfo.username,
-                message: data.message,
-                timestamp: new Date().toLocaleTimeString()
-            };
-            io.to(userInfo.serverId).emit('message', messageData);
-        }
+        const message = String(data.message || '').trim().slice(0, 500);
+        if (!userInfo || !message || !servers.has(userInfo.serverId)) return;
+
+        io.to(userInfo.serverId).emit('message', {
+            username: userInfo.username,
+            message,
+            timestamp: new Date().toLocaleTimeString()
+        });
     });
 
-    // Handle typing indicator
     socket.on('typing', (isTyping) => {
         const userInfo = userSockets.get(socket.id);
         if (userInfo && servers.has(userInfo.serverId)) {
-            socket.to(userInfo.serverId).emit('typing', { 
-                username: userInfo.username, 
-                isTyping 
+            socket.to(userInfo.serverId).emit('typing', {
+                username: userInfo.username,
+                isTyping: Boolean(isTyping)
             });
         }
     });
 
-    // Handle disconnection
     socket.on('disconnect', () => {
         leaveCurrentServer(socket.id);
         console.log('User disconnected:', socket.id);
     });
 });
 
-// Helper functions
 function generateServerId() {
-    return Math.random().toString(36).substring(2, 15);
+    return Math.random().toString(36).slice(2, 15);
 }
 
 function getServersList() {
-    const serversList = [];
-    servers.forEach((server, serverId) => {
-        serversList.push({
-            id: serverId,
-            name: server.name,
-            userCount: server.users.size,
-            hasPassword: !!server.password
-        });
-    });
-    return serversList;
+    return Array.from(servers, ([id, room]) => ({
+        id,
+        name: room.name,
+        userCount: room.users.size,
+        hasPassword: Boolean(room.password)
+    }));
 }
 
 function leaveCurrentServer(socketId) {
     const userInfo = userSockets.get(socketId);
-    if (userInfo && servers.has(userInfo.serverId)) {
-        const server = servers.get(userInfo.serverId);
-        const username = userInfo.username;
-        
-        // Remove user from server
-        server.users.delete(socketId);
-        userSockets.delete(socketId);
-        
-        // Leave socket room
-        const socket = io.sockets.sockets.get(socketId);
-        if (socket) {
-            socket.leave(userInfo.serverId);
-            
-            // Notify others in the server
-            socket.to(userInfo.serverId).emit('userLeft', username);
-            
-            // Send updated user list to remaining users in the server
-            io.to(userInfo.serverId).emit('userList', Array.from(server.users.values()));
-        }
-        
-        console.log(`${username} left server "${server.name}" (${userInfo.serverId})`);
-        
-        // Clean up empty servers (except default)
-        if (server.users.size === 0 && userInfo.serverId !== DEFAULT_SERVER) {
-            servers.delete(userInfo.serverId);
-            io.emit('serversList', getServersList());
-            console.log(`Empty server "${server.name}" (${userInfo.serverId}) removed`);
-        }
+    if (!userInfo || !servers.has(userInfo.serverId)) return;
+
+    const room = servers.get(userInfo.serverId);
+    room.users.delete(socketId);
+    userSockets.delete(socketId);
+
+    const socket = io.sockets.sockets.get(socketId);
+    if (socket) {
+        socket.leave(userInfo.serverId);
+        socket.to(userInfo.serverId).emit('userLeft', userInfo.username);
+        io.to(userInfo.serverId).emit('userList', Array.from(room.users.values()));
+    }
+
+    if (room.users.size === 0 && userInfo.serverId !== DEFAULT_SERVER) {
+        servers.delete(userInfo.serverId);
+        io.emit('serversList', getServersList());
     }
 }
 
 function resetAllServers() {
-    // Remove all users from all servers
-    userSockets.forEach((userInfo, socketId) => {
+    for (const [socketId, userInfo] of userSockets) {
         const socket = io.sockets.sockets.get(socketId);
         if (socket) {
             socket.leave(userInfo.serverId);
-            socket.emit('forceDisconnect', 'All servers have been reset by admin');
+            socket.emit('forceDisconnect', 'The rooms were reset by an admin');
         }
-    });
-    
-    // Clear all data
+    }
+
     servers.clear();
     userSockets.clear();
-    
-    // Recreate default server
     servers.set(DEFAULT_SERVER, {
         name: 'General Chat',
         users: new Map(),
         password: null
     });
-    
-    // Broadcast updated server list
     io.emit('serversList', getServersList());
-    io.emit('systemMessage', 'All servers have been reset. Please rejoin a server.');
+    io.emit('systemMessage', 'Rooms were reset. You can join again.');
 }
 
 function endChatForAllUsers() {
-    // Send disconnect message to all users
-    userSockets.forEach((userInfo, socketId) => {
+    for (const [socketId] of userSockets) {
         const socket = io.sockets.sockets.get(socketId);
-        if (socket) {
-            socket.emit('forceDisconnect', 'Chat has been ended by admin');
-        }
-    });
-    
-    // Clear all users but keep servers
-    servers.forEach((server, serverId) => {
-        server.users.clear();
+        if (socket) socket.emit('forceDisconnect', 'The chat was ended by an admin');
+    }
+
+    for (const [serverId, room] of servers) {
+        room.users.clear();
         io.to(serverId).emit('userList', []);
-    });
-    
+    }
     userSockets.clear();
-    
-    // Broadcast updated server list
     io.emit('serversList', getServersList());
-    io.emit('systemMessage', 'Chat session has been ended by admin.');
+    io.emit('systemMessage', 'The chat session has ended.');
 }
 
-const PORT = process.env.PORT || 3000;
-
+const PORT = Number(process.env.PORT) || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Local WiFi Messenger running on port ${PORT}`);
-    console.log(`Access it at: http://localhost:${PORT}`);
-    
-    // Get local IP address
+    console.log(`Novagram is running on http://localhost:${PORT}`);
+    console.log('Other devices on your network can use one of these addresses:');
+
     const os = require('os');
-    const networkInterfaces = os.networkInterfaces();
-    
-    Object.keys(networkInterfaces).forEach((interfaceName) => {
-        networkInterfaces[interfaceName].forEach((interface) => {
-            if (interface.family === 'IPv4' && !interface.internal) {
-                console.log(`Or from other devices: http://${interface.address}:${PORT}`);
+    for (const interfaces of Object.values(os.networkInterfaces())) {
+        for (const address of interfaces || []) {
+            if (address.family === 'IPv4' && !address.internal) {
+                console.log(`  http://${address.address}:${PORT}`);
             }
-        });
-    });
+        }
+    }
 });
