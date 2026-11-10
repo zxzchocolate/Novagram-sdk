@@ -39,6 +39,7 @@ class LocalMessenger {
         this.messagesContainer = document.getElementById('messagesContainer');
         this.messageInput = document.getElementById('messageInput');
         this.sendBtn = document.getElementById('sendBtn');
+        this.messageForm = document.getElementById('messageForm');
         this.usersList = document.getElementById('usersList');
         this.userCount = document.getElementById('userCount');
         this.connectionStatus = document.getElementById('connectionStatus');
@@ -65,7 +66,10 @@ class LocalMessenger {
         });
         
         // Chat events
-        this.sendBtn.addEventListener('click', () => this.sendMessage());
+        this.messageForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            this.sendMessage();
+        });
         this.messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.sendMessage();
